@@ -1,0 +1,519 @@
+import React, { useState, useEffect } from 'react';
+import { 
+  BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, 
+  AreaChart, Area, PieChart, Pie, Cell, Radar, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis
+} from 'recharts';
+import { 
+  LayoutDashboard, TrendingUp, Users, ShoppingCart, DollarSign, Activity, 
+  Calendar, MapPin, Clock, Award, ArrowUpRight, ArrowDownRight, Filter, MoreHorizontal, Zap, AlertCircle
+} from 'lucide-react';
+
+// --- DATA SIMULATION ---
+
+const SUMMARY_DATA = {
+  totalRevenue: 322966.75,
+  grossIncome: 15379.37,
+  avgRating: 6.97,
+  totalTransactions: 1000
+};
+
+const SALES_OVER_TIME = [
+  { date: 'Ocak', total: 110500, income: 5200 },
+  { date: 'Şubat', total: 98400, income: 4600 },
+  { date: 'Mart', total: 114066, income: 5579 },
+  { date: 'Nisan', total: 105000, income: 5100 },
+  { date: 'Mayıs', total: 118000, income: 5900 },
+];
+
+const BRANCH_PERFORMANCE = [
+  { name: 'A - Yangon', sales: 106200, rating: 7.1, color: '#6366f1' },
+  { name: 'B - Mandalay', sales: 106198, rating: 6.8, color: '#8b5cf6' },
+  { name: 'C - Naypyitaw', sales: 110568, rating: 7.0, color: '#10b981' },
+];
+
+const PRODUCT_PERFORMANCE = [
+  { name: 'Food & Bev.', sales: 56144, profit: 2673, rating: 7.1 },
+  { name: 'Fashion', sales: 54305, profit: 2586, rating: 6.9 },
+  { name: 'Home & Life', sales: 53861, profit: 2564, rating: 6.8 },
+  { name: 'Electronics', sales: 54337, profit: 2587, rating: 7.0 },
+  { name: 'Sports', sales: 55122, profit: 2624, rating: 6.9 },
+  { name: 'Health', sales: 49193, profit: 2342, rating: 7.2 },
+];
+
+const HOURLY_TRAFFIC = [
+  { hour: '10:00', visitors: 85, efficiency: 90 },
+  { hour: '11:00', visitors: 120, efficiency: 85 },
+  { hour: '12:00', visitors: 140, efficiency: 80 },
+  { hour: '13:00', visitors: 160, efficiency: 75 },
+  { hour: '14:00', visitors: 150, efficiency: 78 },
+  { hour: '15:00', visitors: 130, efficiency: 82 },
+  { hour: '16:00', visitors: 110, efficiency: 88 },
+  { hour: '17:00', visitors: 90, efficiency: 92 },
+  { hour: '18:00', visitors: 105, efficiency: 85 },
+  { hour: '19:00', visitors: 180, efficiency: 70 }, // Peak hour
+  { hour: '20:00', visitors: 130, efficiency: 80 },
+];
+
+const CUSTOMER_SEGMENTS = [
+  { name: 'Üye (Kadın)', value: 260, color: '#ec4899' },
+  { name: 'Normal (Kadın)', value: 240, color: '#f472b6' },
+  { name: 'Üye (Erkek)', value: 240, color: '#3b82f6' },
+  { name: 'Normal (Erkek)', value: 260, color: '#60a5fa' },
+];
+
+const PAYMENT_METHODS = [
+  { subject: 'E-Wallet', A: 120, B: 110, C: 130, fullMark: 150 },
+  { subject: 'Nakit', A: 140, B: 100, C: 110, fullMark: 150 },
+  { subject: 'Kredi Kartı', A: 90, B: 130, C: 100, fullMark: 150 },
+];
+
+// --- CUSTOM COMPONENTS ---
+
+const CustomTooltip = ({ active, payload, label }) => {
+  if (active && payload && payload.length) {
+    return (
+      <div className="bg-slate-800 text-white p-3 rounded-lg shadow-xl border border-slate-700">
+        <p className="text-sm font-semibold mb-1">{label}</p>
+        {payload.map((entry, index) => (
+          <p key={index} className="text-xs flex items-center gap-2">
+            <span className="w-2 h-2 rounded-full" style={{ backgroundColor: entry.color }} />
+            <span className="opacity-80">{entry.name}:</span>
+            <span className="font-mono font-bold">{entry.value.toLocaleString()}</span>
+          </p>
+        ))}
+      </div>
+    );
+  }
+  return null;
+};
+
+const KPICard = ({ title, value, icon: Icon, trend, trendValue, colorClass }) => (
+  <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-100 hover:shadow-lg hover:-translate-y-1 transition-all duration-300 group">
+    <div className="flex justify-between items-start mb-4">
+      <div className={`p-3 rounded-2xl ${colorClass} bg-opacity-10 group-hover:bg-opacity-20 transition-colors`}>
+        <Icon className={`w-6 h-6 ${colorClass.replace('bg-', 'text-').replace('-500', '-600')}`} />
+      </div>
+      <div className="flex items-center text-xs font-medium bg-slate-50 px-2 py-1 rounded-full border border-slate-100">
+        {trend === 'up' ? (
+          <span className="text-emerald-600 flex items-center">
+            <ArrowUpRight className="w-3 h-3 mr-1" /> {trendValue}
+          </span>
+        ) : (
+          <span className="text-rose-500 flex items-center">
+            <ArrowDownRight className="w-3 h-3 mr-1" /> {trendValue}
+          </span>
+        )}
+      </div>
+    </div>
+    <div>
+      <h3 className="text-3xl font-bold text-slate-800 tracking-tight">{value}</h3>
+      <p className="text-slate-500 text-sm font-medium mt-1">{title}</p>
+    </div>
+  </div>
+);
+
+const SectionHeader = ({ title, subtitle, icon: Icon }) => (
+  <div className="mb-6 flex items-center justify-between">
+    <div className="flex items-center gap-3">
+      <div className="p-2 bg-indigo-50 rounded-lg">
+        <Icon className="w-5 h-5 text-indigo-600" />
+      </div>
+      <div>
+        <h3 className="text-lg font-bold text-slate-800">{title}</h3>
+        {subtitle && <p className="text-xs text-slate-500">{subtitle}</p>}
+      </div>
+    </div>
+    <button className="text-slate-400 hover:text-indigo-600 transition-colors">
+      <MoreHorizontal className="w-5 h-5" />
+    </button>
+  </div>
+);
+
+const App = () => {
+  const [activeTab, setActiveTab] = useState('overview');
+  const [selectedBranch, setSelectedBranch] = useState('All');
+  const [displayData, setDisplayData] = useState(SUMMARY_DATA);
+
+  useEffect(() => {
+    if (selectedBranch === 'All') {
+      setDisplayData(SUMMARY_DATA);
+    } else {
+      const factor = 0.33;
+      setDisplayData({
+        totalRevenue: (SUMMARY_DATA.totalRevenue * factor).toFixed(2),
+        grossIncome: (SUMMARY_DATA.grossIncome * factor).toFixed(2),
+        avgRating: (SUMMARY_DATA.avgRating + (Math.random() * 0.5 - 0.25)).toFixed(1),
+        totalTransactions: Math.floor(SUMMARY_DATA.totalTransactions * factor)
+      });
+    }
+  }, [selectedBranch]);
+
+  return (
+    <div className="min-h-screen bg-slate-50/50 text-slate-800 font-sans pb-12 selection:bg-indigo-100 selection:text-indigo-900">
+      
+      {/* MODERN HEADER */}
+      <header className="bg-white border-b border-slate-200 sticky top-0 z-30 shadow-sm backdrop-blur-md bg-white/80">
+        <div className="max-w-7xl mx-auto px-6 py-4 flex flex-col md:flex-row justify-between items-center gap-4">
+          <div className="flex items-center gap-3">
+            <div className="bg-gradient-to-tr from-indigo-600 to-purple-600 p-2.5 rounded-xl shadow-lg shadow-indigo-200">
+              <LayoutDashboard className="w-6 h-6 text-white" />
+            </div>
+            <div>
+              <h1 className="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-slate-900 to-slate-600">
+                MarketMaster
+              </h1>
+              <p className="text-xs text-slate-500 font-medium tracking-wide">ANALİTİK PANELİ</p>
+            </div>
+          </div>
+          
+          <div className="flex items-center gap-4 w-full md:w-auto">
+            <div className="relative group w-full md:w-56">
+              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                <Filter className="h-4 w-4 text-slate-400 group-hover:text-indigo-500 transition-colors" />
+              </div>
+              <select 
+                className="block w-full pl-10 pr-4 py-2 bg-slate-100 border-none rounded-xl text-sm font-medium text-slate-700 focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all cursor-pointer appearance-none hover:bg-slate-200"
+                value={selectedBranch}
+                onChange={(e) => setSelectedBranch(e.target.value)}
+              >
+                <option value="All">Tüm Şubeler</option>
+                <option value="A">Şube A (Yangon)</option>
+                <option value="B">Şube B (Mandalay)</option>
+                <option value="C">Şube C (Naypyitaw)</option>
+              </select>
+            </div>
+            <div className="h-10 w-10 rounded-full bg-slate-200 border-2 border-white shadow-sm overflow-hidden flex-shrink-0">
+               <img src="https://ui-avatars.com/api/?name=Admin+User&background=6366f1&color=fff" alt="Profile" />
+            </div>
+          </div>
+        </div>
+      </header>
+
+      <main className="max-w-7xl mx-auto px-6 mt-8">
+        
+        {/* KPI SECTION */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-10">
+          <KPICard 
+            title="Toplam Ciro" 
+            value={`$${Number(displayData.totalRevenue).toLocaleString()}`} 
+            icon={DollarSign} 
+            trend="up" trendValue="%4.2" 
+            colorClass="bg-indigo-500" 
+          />
+          <KPICard 
+            title="Brüt Kâr" 
+            value={`$${Number(displayData.grossIncome).toLocaleString()}`} 
+            icon={Zap} 
+            trend="up" trendValue="%1.8" 
+            colorClass="bg-emerald-500" 
+          />
+          <KPICard 
+            title="Müşteri Puanı" 
+            value={displayData.avgRating} 
+            icon={Award} 
+            trend="down" trendValue="%0.5" 
+            colorClass="bg-amber-500" 
+          />
+          <KPICard 
+            title="İşlem Adedi" 
+            value={displayData.totalTransactions} 
+            icon={ShoppingCart} 
+            trend="up" trendValue="%12" 
+            colorClass="bg-rose-500" 
+          />
+        </div>
+
+        {/* MODERN TABS */}
+        <div className="flex justify-center mb-10">
+          <div className="bg-white p-1.5 rounded-2xl shadow-sm border border-slate-200 inline-flex">
+            {['overview', 'products', 'operations'].map((tab) => (
+              <button
+                key={tab}
+                onClick={() => setActiveTab(tab)}
+                className={`px-6 py-2.5 rounded-xl text-sm font-bold transition-all duration-200 ${
+                  activeTab === tab 
+                    ? 'bg-slate-900 text-white shadow-md' 
+                    : 'text-slate-500 hover:text-slate-900 hover:bg-slate-50'
+                }`}
+              >
+                {tab === 'overview' && 'Genel Bakış'}
+                {tab === 'products' && 'Ürün Analizi'}
+                {tab === 'operations' && 'Operasyon'}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* CONTENT AREA */}
+        <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+          
+          {/* --- GENEL BAKIŞ --- */}
+          {activeTab === 'overview' && (
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+              {/* Main Chart */}
+              <div className="lg:col-span-8 bg-white p-8 rounded-3xl shadow-sm border border-slate-100">
+                <SectionHeader title="Satış Trendi" subtitle="Son 5 aylık gelir performansı" icon={Activity} />
+                <div className="h-80">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <AreaChart data={SALES_OVER_TIME}>
+                      <defs>
+                        <linearGradient id="colorTotal" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%" stopColor="#6366f1" stopOpacity={0.3}/>
+                          <stop offset="95%" stopColor="#6366f1" stopOpacity={0}/>
+                        </linearGradient>
+                      </defs>
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                      <XAxis dataKey="date" axisLine={false} tickLine={false} tick={{fill: '#94a3b8', fontSize: 12}} dy={10} />
+                      <YAxis axisLine={false} tickLine={false} tick={{fill: '#94a3b8', fontSize: 12}} />
+                      <Tooltip content={<CustomTooltip />} />
+                      <Area type="monotone" dataKey="total" stroke="#6366f1" strokeWidth={3} fillOpacity={1} fill="url(#colorTotal)" />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+
+              {/* Sidebar Stats */}
+              <div className="lg:col-span-4 space-y-6">
+                <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-100 h-full flex flex-col">
+                  <SectionHeader title="Şube Sıralaması" icon={MapPin} />
+                  <div className="flex-1">
+                    <ResponsiveContainer width="100%" height="100%" minHeight={250}>
+                      <BarChart data={BRANCH_PERFORMANCE} layout="vertical" margin={{ left: 0, right: 30 }}>
+                        <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#f1f5f9" />
+                        <XAxis type="number" hide />
+                        <YAxis dataKey="name" type="category" width={100} tick={{fontSize: 11, fontWeight: 600, fill: '#475569'}} axisLine={false} tickLine={false} />
+                        <Tooltip content={<CustomTooltip />} cursor={{fill: '#f8fafc'}} />
+                        <Bar dataKey="sales" radius={[0, 6, 6, 0]} barSize={24}>
+                          {BRANCH_PERFORMANCE.map((entry, index) => (
+                            <Cell key={`cell-${index}`} fill={entry.color} />
+                          ))}
+                        </Bar>
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                  
+                  <div className="mt-4 p-4 bg-indigo-50 rounded-2xl border border-indigo-100 flex items-start gap-3">
+                     <div className="p-2 bg-indigo-100 rounded-lg text-indigo-600">
+                        <Award className="w-4 h-4" />
+                     </div>
+                     <div>
+                        <h4 className="text-sm font-bold text-indigo-900">Ayın Şubesi: C</h4>
+                        <p className="text-xs text-indigo-700 mt-1">Naypyitaw şubesi %4 büyüme ile liderliği koruyor.</p>
+                     </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Bottom Cards */}
+              <div className="lg:col-span-4 bg-gradient-to-br from-indigo-600 to-violet-600 rounded-3xl p-8 text-white shadow-xl shadow-indigo-200">
+                <div className="flex items-center gap-3 mb-6">
+                  <div className="bg-white/20 p-2 rounded-lg backdrop-blur-sm">
+                    <TrendingUp className="w-5 h-5 text-white" />
+                  </div>
+                  <h3 className="font-bold text-lg">Hızlı İçgörü</h3>
+                </div>
+                <div className="space-y-6">
+                  <div>
+                    <p className="text-indigo-100 text-sm mb-1">En Popüler Ödeme</p>
+                    <div className="flex justify-between items-end">
+                      <p className="text-3xl font-bold">E-Wallet</p>
+                      <span className="text-sm bg-white/20 px-2 py-1 rounded-lg text-white font-medium">%34 Pay</span>
+                    </div>
+                    <div className="w-full bg-black/20 h-1.5 rounded-full mt-3 overflow-hidden">
+                      <div className="bg-white h-full rounded-full" style={{width: '34%'}}></div>
+                    </div>
+                  </div>
+                  <div className="pt-4 border-t border-white/10">
+                    <p className="text-indigo-100 text-sm mb-1">Müşteri Tipi</p>
+                    <div className="flex gap-4 mt-2">
+                       <div className="flex-1 bg-white/10 p-3 rounded-xl">
+                          <span className="block text-2xl font-bold">50.1%</span>
+                          <span className="text-xs text-indigo-200">Üye</span>
+                       </div>
+                       <div className="flex-1 bg-white/10 p-3 rounded-xl">
+                          <span className="block text-2xl font-bold">49.9%</span>
+                          <span className="text-xs text-indigo-200">Normal</span>
+                       </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="lg:col-span-8 bg-white p-8 rounded-3xl shadow-sm border border-slate-100">
+                 <div className="flex justify-between items-center mb-6">
+                    <SectionHeader title="Ödeme Yöntemi Dağılımı" icon={Users} />
+                    <div className="flex gap-4 text-sm">
+                       <span className="flex items-center gap-1 text-slate-500"><span className="w-2 h-2 rounded-full bg-blue-500"></span> Şube A</span>
+                       <span className="flex items-center gap-1 text-slate-500"><span className="w-2 h-2 rounded-full bg-violet-500"></span> Şube B</span>
+                       <span className="flex items-center gap-1 text-slate-500"><span className="w-2 h-2 rounded-full bg-emerald-500"></span> Şube C</span>
+                    </div>
+                 </div>
+                 <div className="h-64">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <RadarChart cx="50%" cy="50%" outerRadius="80%" data={PAYMENT_METHODS}>
+                        <PolarGrid stroke="#e2e8f0" />
+                        <PolarAngleAxis dataKey="subject" tick={{ fill: '#64748b', fontSize: 12, fontWeight: 600 }} />
+                        <PolarRadiusAxis angle={30} domain={[0, 150]} tick={false} axisLine={false} />
+                        <Tooltip content={<CustomTooltip />} />
+                        <Radar name="Şube A" dataKey="A" stroke="#3b82f6" strokeWidth={2} fill="#3b82f6" fillOpacity={0.2} />
+                        <Radar name="Şube B" dataKey="B" stroke="#8b5cf6" strokeWidth={2} fill="#8b5cf6" fillOpacity={0.2} />
+                        <Radar name="Şube C" dataKey="C" stroke="#10b981" strokeWidth={2} fill="#10b981" fillOpacity={0.2} />
+                      </RadarChart>
+                    </ResponsiveContainer>
+                 </div>
+              </div>
+            </div>
+          )}
+
+          {/* --- ÜRÜN ANALİZİ --- */}
+          {activeTab === 'products' && (
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+              <div className="bg-white p-8 rounded-3xl shadow-sm border border-slate-100">
+                <div className="flex justify-between items-center mb-2">
+                  <SectionHeader title="Kârlılık Analizi" icon={TrendingUp} />
+                  <span className="bg-emerald-100 text-emerald-700 text-xs font-bold px-3 py-1 rounded-full uppercase tracking-wide">Pareto</span>
+                </div>
+                <div className="h-96">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={PRODUCT_PERFORMANCE} margin={{ top: 20, right: 0, left: -20, bottom: 0 }}>
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                      <XAxis dataKey="name" tick={{fontSize: 10, fill: '#64748b'}} interval={0} axisLine={false} tickLine={false} dy={10} />
+                      <YAxis yAxisId="left" orientation="left" axisLine={false} tickLine={false} tick={{fontSize: 10, fill: '#94a3b8'}} />
+                      <YAxis yAxisId="right" orientation="right" axisLine={false} tickLine={false} tick={{fontSize: 10, fill: '#94a3b8'}} />
+                      <Tooltip content={<CustomTooltip />} />
+                      <Legend iconType="circle" wrapperStyle={{ paddingTop: '20px' }} />
+                      <Bar yAxisId="left" dataKey="sales" name="Ciro" fill="#818cf8" radius={[6, 6, 0, 0]} barSize={20} />
+                      <Bar yAxisId="right" dataKey="profit" name="Net Kâr" fill="#34d399" radius={[6, 6, 0, 0]} barSize={20} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+
+              <div className="space-y-6">
+                <div className="bg-white p-8 rounded-3xl shadow-sm border border-slate-100">
+                  <SectionHeader title="Müşteri Memnuniyeti" icon={Award} />
+                  <div className="space-y-5">
+                    {PRODUCT_PERFORMANCE.map((product) => (
+                      <div key={product.name}>
+                        <div className="flex justify-between text-sm mb-2">
+                          <span className="font-semibold text-slate-700">{product.name}</span>
+                          <span className="font-bold text-slate-900">{product.rating}</span>
+                        </div>
+                        <div className="w-full bg-slate-100 rounded-full h-3 overflow-hidden">
+                          <div 
+                            className={`h-full rounded-full transition-all duration-1000 ${product.rating >= 7.0 ? 'bg-indigo-500' : 'bg-amber-500'}`}
+                            style={{ width: `${(product.rating / 10) * 100}%` }}
+                          ></div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="bg-amber-50 rounded-3xl p-6 border border-amber-100 flex gap-4">
+                  <div className="p-3 bg-amber-100 rounded-xl h-fit text-amber-600">
+                    <AlertCircle className="w-6 h-6" />
+                  </div>
+                  <div>
+                    <h4 className="font-bold text-amber-900 text-lg">Dikkat Gerektiriyor</h4>
+                    <p className="text-amber-800 text-sm mt-1 leading-relaxed">
+                      "Home & Lifestyle" kategorisi kârlı olmasına rağmen <strong>6.8</strong> ile en düşük puana sahip. İade oranları ve ürün kalitesi incelenmeli.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* --- OPERASYON --- */}
+          {activeTab === 'operations' && (
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+              <div className="lg:col-span-2 bg-white p-8 rounded-3xl shadow-sm border border-slate-100">
+                <SectionHeader title="Saatlik Yoğunluk Isı Haritası" icon={Clock} />
+                <div className="h-80">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <AreaChart data={HOURLY_TRAFFIC}>
+                      <defs>
+                        <linearGradient id="colorVisitors" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%" stopColor="#f43f5e" stopOpacity={0.8}/>
+                          <stop offset="95%" stopColor="#f43f5e" stopOpacity={0}/>
+                        </linearGradient>
+                      </defs>
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                      <XAxis dataKey="hour" axisLine={false} tickLine={false} tick={{fill: '#64748b', fontSize: 12}} dy={10} />
+                      <YAxis axisLine={false} tickLine={false} tick={{fill: '#94a3b8', fontSize: 12}} />
+                      <Tooltip content={<CustomTooltip />} />
+                      <Area type="monotone" dataKey="visitors" name="Müşteri" stroke="#f43f5e" strokeWidth={3} fillOpacity={1} fill="url(#colorVisitors)" />
+                      <Area type="monotone" dataKey="efficiency" name="Verimlilik" stroke="#cbd5e1" strokeWidth={2} strokeDasharray="5 5" fill="none" />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+
+              <div className="space-y-6">
+                 {/* Customer Segments Pie */}
+                <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-100 flex flex-col items-center justify-center">
+                  <h3 className="font-bold text-slate-800 mb-4 self-start w-full">Müşteri Dağılımı</h3>
+                  <div className="h-56 w-full relative">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <PieChart>
+                        <Pie
+                          data={CUSTOMER_SEGMENTS}
+                          cx="50%"
+                          cy="50%"
+                          innerRadius={50}
+                          outerRadius={70}
+                          paddingAngle={5}
+                          dataKey="value"
+                          cornerRadius={4}
+                        >
+                          {CUSTOMER_SEGMENTS.map((entry, index) => (
+                            <Cell key={`cell-${index}`} fill={entry.color} stroke="none" />
+                          ))}
+                        </Pie>
+                        <Tooltip />
+                      </PieChart>
+                    </ResponsiveContainer>
+                    <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                       <span className="text-3xl font-bold text-slate-800">1k</span>
+                       <span className="text-xs text-slate-400 font-medium">Toplam</span>
+                    </div>
+                  </div>
+                  <div className="w-full grid grid-cols-2 gap-2 mt-2">
+                     {CUSTOMER_SEGMENTS.map((seg, i) => (
+                        <div key={i} className="flex items-center gap-2 text-xs text-slate-600">
+                           <span className="w-2 h-2 rounded-full" style={{backgroundColor: seg.color}}></span>
+                           {seg.name}
+                        </div>
+                     ))}
+                  </div>
+                </div>
+
+                {/* Actions Panel */}
+                <div className="bg-slate-900 text-white p-6 rounded-3xl shadow-xl">
+                  <div className="flex items-center gap-2 mb-4">
+                     <Zap className="w-5 h-5 text-yellow-400" />
+                     <h3 className="font-bold text-lg">Aksiyon Planı</h3>
+                  </div>
+                  <ul className="space-y-3">
+                    <li className="flex gap-3 items-start bg-white/10 p-3 rounded-xl border border-white/5 hover:bg-white/20 transition-colors cursor-pointer">
+                      <div className="w-1.5 h-1.5 rounded-full bg-rose-500 mt-2 shrink-0"></div>
+                      <span className="text-sm font-medium opacity-90">Saat 18:30'da ek kasa açılışı yapılmalı.</span>
+                    </li>
+                    <li className="flex gap-3 items-start bg-white/10 p-3 rounded-xl border border-white/5 hover:bg-white/20 transition-colors cursor-pointer">
+                      <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 mt-2 shrink-0"></div>
+                      <span className="text-sm font-medium opacity-90">Şube C personeli ödüllendirilmeli.</span>
+                    </li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+          )}
+
+        </div>
+      </main>
+    </div>
+  );
+};
+
+export default App;
